@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Who is the Liar?</title>
+<style>
+  body {
+    margin: 0;
+    background: #000;
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    height: 100vh; 
+    font-family: sans-serif;
+  }
+  .scene {
+    perspective: 800px;
+  }
+  .card {
+    width: 300px; 
+    height: 450px;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.6s ease;
+  }
+  .card.is-flipped {
+    transform: rotateY(180deg);
+  }
+  .face {
+    position: absolute;
+    width: 100%; 
+    height: 100%;
+    backface-visibility: hidden;
+    border: 3px solid #333;
+    border-radius: 12px;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+    background: white;
+    display: flex; 
+    flex-direction: column;
+    justify-content: center; /* center vertically */
+    align-items: center;     /* center horizontally */
+    padding: 16px; 
+    box-sizing: border-box;
+  }
+  .back {
+    transform: rotateY(180deg);
+    align-items: center; 
+    justify-content: center;
+    color: #555;
+    font-size: 1.2rem;
+  }
+  .corner { 
+    position: absolute; 
+    font-size: 1.5rem; 
+    font-weight: bold; 
+    color: red; 
+  }
+  .corner.top { top: 8px; left: 12px; }
+  .corner.bottom { bottom: 8px; right: 12px; transform: rotate(180deg); }
+  #display { 
+    font-size: clamp(1.2rem, 2vw + 0.5rem, 1.6rem); 
+    text-align: center; 
+    white-space: pre-line; 
+    margin-bottom: 20px; /* spacing below the text */
+  }
+  #btn-container { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 12px; 
+    width: 100%;
+    align-items: center;
+  }
+  button {
+    padding: 12px; 
+    font-size: 1rem;
+    border: none; 
+    border-radius: 6px;
+    background: #007bff; 
+    color: #fff; 
+    cursor: pointer;
+    width: 100%;      /* full width buttons */
+    max-width: 200px; /* max width */
+  }
+  button:active { background: #0056b3; }
+  .vote-btn { background: #28a745; }
+  .vote-btn:active { background: #218838; }
+</style>
+</head>
+<body>
+
+<div class="scene">
+  <div class="card" id="card">
+    <div class="face front">
+      <span class="corner top">Q ♥</span>
+      <div id="display">Who is the Liar?</div>
+      <div id="btn-container">
+        <button id="actionBtn">Start</button>
+      </div>
+      <span class="corner bottom">Q ♥</span>
+    </div>
+    <div class="face back">
+      <div>👀</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let numPlayers=0, currentPlayer=0, impostorIndex=-1, phase='start';
+    const wordList = [
+
+    // Animals
+    { word: 'Penguin', category: 'animal' },
+    { word: 'Giraffe', category: 'animal' },
+    { word: 'Kangaroo', category: 'animal' },
+    { word: 'Sloth', category: 'animal' },
+    { word: 'Octopus', category: 'animal' },
+    { word: 'Narwhal', category: 'animal' },
+    { word: 'Axolotl', category: 'animal' },
+    { word: 'Pygmy Marmoset', category: 'animal' },
+    { word: 'Platypus', category: 'animal' },
+    { word: 'Quokka', category: 'animal' },
+    { word: 'Cheetah', category: 'animal' },
+    { word: 'Zebra', category: 'animal' },
+    { word: 'Dolphin', category: 'animal' },
+    { word: 'Elephant', category: 'animal' },
+    { word: 'Gorilla', category: 'animal' },
+    { word: 'Hippopotamus', category: 'animal' },
+    { word: 'Iguana', category: 'animal' },
+    { word: 'Jaguar', category: 'animal' },
+    { word: 'Koala', category: 'animal' },
+    { word: 'Lynx', category: 'animal' },
+    { word: 'Meerkat', category: 'animal' },
+    { word: 'Narwhal', category: 'animal' },
+    { word: 'Ocelot', category: 'animal' },
+    { word: 'Quail', category: 'animal' },
+    { word: 'Raccoon', category: 'animal' },
+    { word: 'Shark', category: 'animal' },
+    { word: 'Tiger', category: 'animal' },
+    { word: 'Unicorn', category: 'animal' },
+    { word: 'Vulture', category: 'animal' },
+    { word: 'Walrus', category: 'animal' },
+    { word: 'Xenopus', category: 'animal' },
+    { word: 'Yak', category: 'animal' },
+    { word: 'Zebu', category: 'animal' },
+
+    // Movies
+    { word: 'Inception', category: 'movie' },
+    { word: 'Avatar', category: 'movie' },
+    { word: 'Titanic', category: 'movie' },
+    { word: 'The Matrix', category: 'movie' },
+    { word: 'The Lion King', category: 'movie' },
+    { word: 'Jurassic Park', category: 'movie' },
+    { word: 'The Dark Knight', category: 'movie' },
+    { word: 'Gladiator', category: 'movie' },
+    { word: 'Forrest Gump', category: 'movie' },
+    { word: 'The Godfather', category: 'movie' },
+    { word: 'Star Wars: A New Hope', category: 'movie' },
+    { word: 'The Shawshank Redemption', category: 'movie' },
+    { word: 'Pulp Fiction', category: 'movie' },
+    { word: 'The Silence of the Lambs', category: 'movie' },
+    { word: 'Goodfellas', category: 'movie' },
+    { word: 'The Empire Strikes Back', category: 'movie' },
+    { word: 'The Lord of the Rings: The Fellowship of the Ring', category: 'movie' },
+    { word: 'The Matrix Reloaded', category: 'movie' },
+    { word: 'The Dark Knight Rises', category: 'movie' },
+    { word: 'The Lion King 2', category: 'movie' },
+    { word: 'The Incredibles', category: 'movie' },
+    { word: 'The Avengers', category: 'movie' },
+    { word: 'The Hunger Games', category: 'movie' },
+    { word: 'The Twilight Saga', category: 'movie' },
+    { word: 'The Maze Runner', category: 'movie' },
+    { word: 'The Fault in Our Stars', category: 'movie' },
+    { word: 'The Pursuit of Happyness', category: 'movie' },
+    { word: 'The Secret Life of Walter Mitty', category: 'movie' },
+    { word: 'The Social Network', category: 'movie' },
+    { word: 'The Martian', category: 'movie' },
+    { word: 'The Revenant', category: 'movie' },
+    { word: 'The Imitation Game', category: 'movie' },
+    { word: 'The Big Short', category: 'movie' },
+    { word: 'The Theory of Everything', category: 'movie' },
+    { word: 'The Grand Budapest Hotel', category: 'movie' },
+    { word: 'The Lego Movie', category: 'movie' },
+    { word: 'The Lego Batman Movie', category: 'movie' },
+    { word: 'The Lego Ninjago Movie', category: 'movie' },
+
+    // Fictional Characters
+    { word: 'Mickey Mouse', category: 'fictional character' },
+    { word: 'Superman', category: 'fictional character' },
+    { word: 'Batman', category: 'fictional character' },
+    { word: 'Spider-Man', category: 'fictional character' },
+    { word: 'Wonder Woman', category: 'fictional character' },
+    { word: 'Sherlock Holmes', category: 'fictional character' },
+    { word: 'Winnie the Pooh', category: 'fictional character' },
+    { word: 'Donald Duck', category: 'fictional character' },
+    { word: 'Snoopy', category: 'fictional character' },
+    { word: 'Bart Simpson', category: 'fictional character' },
+
+    // Movie & TV Legends
+    { word: 'Harry Potter', category: 'fictional character' },
+    { word: 'Hermione Granger', category: 'fictional character' },
+    { word: 'Ron Weasley', category: 'fictional character' },
+    { word: 'Luke Skywalker', category: 'fictional character' },
+    { word: 'Darth Vader', category: 'fictional character' },
+    { word: 'Indiana Jones', category: 'fictional character' },
+    { word: 'Forrest Gump', category: 'fictional character' },
+    { word: 'Jack Sparrow', category: 'fictional character' },
+    { word: 'Katniss Everdeen', category: 'fictional character' },
+    { word: 'Daenerys Targaryen', category: 'fictional character' },
+
+    // Anime & Manga Favorites
+    { word: 'Naruto Uzumaki', category: 'fictional character' },
+    { word: 'Monkey D. Luffy', category: 'fictional character' },
+    { word: 'Son Goku', category: 'fictional character' },
+    { word: 'Sailor Moon', category: 'fictional character' },
+    { word: 'Astro Boy', category: 'fictional character' },
+
+    // Video Game Icons
+    { word: 'Mario', category: 'fictional character' },
+    { word: 'Princess Peach', category: 'fictional character' },
+    { word: 'Link', category: 'fictional character' },
+    { word: 'Samus Aran', category: 'fictional character' },
+    { word: 'Pikachu', category: 'fictional character' },
+
+    // Literary Classics
+    { word: 'Alice', category: 'fictional character' },
+    { word: 'Peter Pan', category: 'fictional character' },
+    { word: 'Hercule Poirot', category: 'fictional character' },
+    { word: 'Jay Gatsby', category: 'fictional character' },
+    { word: 'Atticus Finch', category: 'fictional character' },
+
+    // Animated Series Stars
+    { word: 'Tom and Jerry', category: 'fictional character' },
+    { word: 'Scooby-Doo', category: 'fictional character' },
+    { word: 'Daffy Duck', category: 'fictional character' },
+    { word: 'Bugs Bunny', category: 'fictional character' },
+    { word: 'Popeye', category: 'fictional character' },
+
+    // Superheroes & Villains
+    { word: 'Iron Man', category: 'fictional character' },
+    { word: 'Captain America', category: 'fictional character' },
+    { word: 'The Joker', category: 'fictional character' },
+    { word: 'Harley Quinn', category: 'fictional character' },
+    { word: 'Deadpool', category: 'fictional character' },
+
+    // Disney & Pixar Favorites
+    { word: 'Elsa', category: 'fictional character' },
+    { word: 'Buzz Lightyear', category: 'fictional character' },
+    { word: 'Woody', category: 'fictional character' },
+    { word: 'Lightning McQueen', category: 'fictional character' },
+    { word: 'Mike Wazowski', category: 'fictional character' },
+
+    // Mythology & Folklore
+    { word: 'Medusa', category: 'fictional character' },
+    { word: 'Hercules', category: 'fictional character' },
+    { word: 'Thor', category: 'fictional character' },
+    { word: 'Zeus', category: 'fictional character' },
+    { word: 'Anubis', category: 'fictional character' },
+
+    // Pop Culture Phenoms
+    { word: 'Rick Sanchez', category: 'fictional character' },
+    { word: 'Morty Smith', category: 'fictional character' },
+    { word: 'Eleven', category: 'fictional character' },
+    { word: 'Jon Snow', category: 'fictional character' },
+    { word: 'Walter White', category: 'fictional character' },
+
+    // Horror & Thriller Icons
+    { word: 'Freddy Krueger', category: 'fictional character' },
+    { word: 'Jason Voorhees', category: 'fictional character' },
+    { word: 'Chucky', category: 'fictional character' },
+    { word: 'Pennywise', category: 'fictional character' },
+    { word: 'Hannibal Lecter', category: 'fictional character' },
+
+    // Villains & Antiheroes
+    { word: 'Voldemort', category: 'fictional character' },
+    { word: 'Magneto', category: 'fictional character' },
+    { word: 'Loki', category: 'fictional character' },
+    { word: 'Thanos', category: 'fictional character' },
+    { word: 'Joker', category: 'fictional character' },
+
+    // Iconic Sidekicks
+    { word: 'Robin', category: 'fictional character' },
+    { word: 'Bucky Barnes', category: 'fictional character' },
+    { word: 'Samwise Gamgee', category: 'fictional character' },
+    { word: 'Chewbacca', category: 'fictional character' },
+    { word: 'Donkey', category: 'fictional character' },
+
+    // Literary Heroines
+    { word: 'Jo March', category: 'fictional character' },
+    { word: 'Matilda Wormwood', category: 'fictional character' },
+    { word: 'Nancy Drew', category: 'fictional character' },
+    { word: 'Meg March', category: 'fictional character' },
+    { word: 'Anne Shirley', category: 'fictional character' },
+
+    // Legendary Creatures
+    { word: 'Bigfoot', category: 'fictional character' },
+    { word: 'Loch Ness Monster', category: 'fictional character' },
+    { word: 'Chupacabra', category: 'fictional character' },
+    { word: 'Mothman', category: 'fictional character' },
+    { word: 'Jersey Devil', category: 'fictional character' },
+
+    // Animated Movie Stars
+    { word: 'Shrek', category: 'fictional character' },
+    { word: 'Fiona', category: 'fictional character' },
+    { word: 'Donkey', category: 'fictional character' },
+    { word: 'Po', category: 'fictional character' },
+    { word: 'Kung Fu Panda', category: 'fictional character' },
+
+    // Fantasy & Sci-Fi Icons
+    { word: 'Gandalf', category: 'fictional character' },
+    { word: 'Frodo Baggins', category: 'fictional character' },
+    { word: 'Legolas', category: 'fictional character' },
+    { word: 'Aragorn', category: 'fictional character' },
+    { word: 'Gollum', category: 'fictional character' },
+
+    // Classic Villains
+    { word: 'Dracula', category: 'fictional character' },
+    { word: 'Frankenstein', category: 'fictional character' },
+    { word: 'The Mummy', category: 'fictional character' },
+    { word: 'The Invisible Man', category: 'fictional character' },
+    { word: 'The Wolfman', category: 'fictional character' },
+
+    // Historical Fiction Icons
+    { word: 'Cleopatra', category: 'fictional character' },
+    { word: 'Julius Caesar', category: 'fictional character' },
+    { word: 'Napoleon Bonaparte', category: 'fictional character' },
+    { word: 'Joan of Arc', category: 'fictional character' },
+    { word: 'King Arthur', category: 'fictional character' },
+
+    // Literary Villains
+    { word: 'Iago', category: 'fictional character' },
+    { word: 'Lady Macbeth', category: 'fictional character' },
+    { word: 'Count Dracula', category: 'fictional character' },
+    { word: 'Sauron', category: 'fictional character' },
+    { word: 'Voldemort', category: 'fictional character' },
+
+    // Supernatural Entities
+    { word: 'Ghostface', category: 'fictional character' },
+    { word: 'Samara Morgan', category: 'fictional character' },
+    { word: 'Pennywise', category: 'fictional character' },
+    { word: 'The Babadook', category: 'fictional character' },
+    { word: 'The Nun', category: 'fictional character' },
+
+    // Fairy Tale Characters
+    { word: 'Cinderella', category: 'fictional character' },
+    { word: 'Snow White', category: 'fictional character' },
+    { word: 'Little Red Riding Hood', category: 'fictional character' },
+    { word: 'Rapunzel', category: 'fictional character' },
+    { word: 'Beauty and the Beast', category: 'fictional character' },
+
+    // Classic Movie Monsters
+    { word: 'Godzilla', category: 'fictional character' },
+    { word: 'King Kong', category: 'fictional character' },
+    { word: 'Mothra', category: 'fictional character' },
+    { word: 'Rodan', category: 'fictional character' },
+    { word: 'Gamera', category: 'fictional character' },
+
+    // Celebrities
+    { word: 'Zendaya', category: 'celebrity' },
+    { word: 'Timothée Chalamet', category: 'celebrity' },
+    { word: 'Billie Eilish', category: 'celebrity' },
+    { word: 'Dwayne Johnson', category: 'celebrity' },
+    { word: 'Taylor Swift', category: 'celebrity' },
+    { word: 'Chris Hemsworth', category: 'celebrity' },
+    { word: 'Olivia Rodrigo', category: 'celebrity' },
+    { word: 'Ryan Reynolds', category: 'celebrity' },
+    { word: 'Gigi Hadid', category: 'celebrity' },
+    { word: 'Florence Pugh', category: 'celebrity' },
+    { word: 'Bad Bunny', category: 'celebrity' },
+    { word: 'Khaby Lame', category: 'celebrity' },
+    { word: 'Leni Klum', category: 'celebrity' },
+    { word: 'Raye', category: 'celebrity' },
+    { word: 'Rebel Wilson', category: 'celebrity' },
+    { word: 'Rachel Zegler', category: 'celebrity' },
+    { word: 'Jonathan Bailey', category: 'celebrity' },
+    { word: 'Rupert Friend', category: 'celebrity' },
+    { word: 'Prince William', category: 'celebrity' },
+    { word: 'Kate Middleton', category: 'celebrity' },
+    { word: 'Brad Pitt', category: 'celebrity' },
+    { word: 'Julia Roberts', category: 'celebrity' },
+    { word: 'Mahershala Ali', category: 'celebrity' },
+    { word: 'Usher', category: 'celebrity' },
+    { word: 'Johnny Depp', category: 'celebrity' },
+    { word: 'Will Smith', category: 'celebrity' },
+    { word: 'Jaden Smith', category: 'celebrity' },
+    { word: 'Lady Gaga', category: 'celebrity' },
+    { word: 'Rosé', category: 'celebrity' },
+    { word: 'Cardi B', category: 'celebrity' },
+    { word: 'Miley Cyrus', category: 'celebrity' },
+    { word: 'Emma Stone', category: 'celebrity' },
+    { word: 'Hailey Bieber', category: 'celebrity' },
+    { word: 'Selena Gomez', category: 'celebrity' },
+    { word: 'Charli D’Amelio', category: 'celebrity' },
+    { word: 'Bella Poarch', category: 'celebrity' },
+    { word: 'Addison Rae', category: 'celebrity' },
+    { word: 'Zach King', category: 'celebrity' },
+    { word: 'Kendrick Lamar', category: 'celebrity' },
+    { word: 'Gwyneth Paltrow', category: 'celebrity' },
+    { word: 'Jay-Z', category: 'celebrity' },
+    { word: 'Scarlett Johansson', category: 'celebrity' },
+    { word: 'Meryl Streep', category: 'celebrity' },
+    { word: 'Ariana Grande', category: 'celebrity' },
+    { word: 'Khloe Kardashian', category: 'celebrity' },
+    { word: 'Kathy Bates', category: 'celebrity' },
+    { word: 'Missy Elliott', category: 'celebrity' },
+    { word: 'Tom Cruise', category: 'celebrity' },
+    { word: 'Lana Del Rey', category: 'celebrity' },
+    { word: 'Solange Knowles', category: 'celebrity' },
+    { word: 'Mindy Kaling', category: 'celebrity' },
+    { word: 'Post Malone', category: 'celebrity' },
+    { word: 'Jeremy Clarkson', category: 'celebrity' },
+    { word: 'Travis Kelce', category: 'celebrity' },
+    { word: 'Reese Witherspoon', category: 'celebrity' },
+    { word: 'Alex Cooper', category: 'celebrity' },
+    { word: 'Eric Dane', category: 'celebrity' },
+    { word: 'Janell Shirtcliff', category: 'celebrity' },
+    { word: 'Rag’n’Bone Man', category: 'celebrity' },
+    { word: 'Romesh Ranganathan', category: 'celebrity' },
+    { word: 'Anna Camp', category: 'celebrity' }
+    ];
+
+
+  let choice = {};
+  const card = document.getElementById('card');
+  const display = document.getElementById('display');
+  const container = document.getElementById('btn-container');
+  const actionBtn = document.getElementById('actionBtn');
+
+  actionBtn.onclick = () => flipThen(() => {
+    if (phase==='start') pickPlayerCount();
+    else if (phase==='ready') showCard();
+    else if (phase==='voteReady') startVoting();
+  });
+
+  function flipThen(callback){
+    card.classList.add('is-flipped');
+    setTimeout(()=>{
+      callback();
+      card.classList.remove('is-flipped');
+    }, 600);
+  }
+
+  function pickPlayerCount(){
+    phase='ready'; 
+    display.textContent='Select number of players';
+    container.innerHTML='';
+    [3,4,5,6,7,8].forEach(n=>{
+      const b=document.createElement('button');
+      b.textContent=`${n} Players`;
+      b.onclick = () => flipThen(()=>{
+        numPlayers=n;
+        impostorIndex=Math.floor(Math.random()*n);
+        choice=wordList[Math.floor(Math.random()*wordList.length)];
+        currentPlayer=1;
+        showReady();
+      });
+      container.appendChild(b);
+    });
+  }
+
+  function showReady(){
+    display.textContent=`Player ${currentPlayer}, ready?`;
+    container.innerHTML='';
+    const b=document.createElement('button');
+    b.textContent='Ready';
+    b.onclick = () => flipThen(showCard);
+    container.appendChild(b);
+  }
+
+  function showCard(){
+    phase='cardShown';
+    const isImp = currentPlayer-1 === impostorIndex;
+    display.textContent = isImp
+      ? `Player ${currentPlayer}, you're the IMPOSTOR.\nCategory: ${choice.category}`
+      : `Player ${currentPlayer}, you're an INVESTIGATOR.\nWord: ${choice.word}\nCategory: ${choice.category}`;
+    container.innerHTML='';
+    const b=document.createElement('button');
+    b.textContent = currentPlayer < numPlayers ? 'Next Player' : 'Discuss & Vote';
+    b.onclick = () => flipThen(() => {
+      if (currentPlayer < numPlayers) {
+        currentPlayer++; showReady();
+      } else {
+        phase='voteReady';
+        startVoting();
+      }
+    });
+    container.appendChild(b);
+  }
+
+  function startVoting(){
+    phase='voteReady';
+    display.textContent="Discuss and choose who's the Impostor:";
+    container.innerHTML='';
+    for(let i=1;i<=numPlayers;i++){
+      const b=document.createElement('button');
+      b.textContent=`Player ${i}`;
+      b.className='vote-btn';
+      b.onclick = () => flipThen(()=> finishVoting(i-1));
+      container.appendChild(b);
+    }
+  }
+
+  function finishVoting(chosen){
+    display.textContent = chosen===impostorIndex
+      ? `✅ Correct! Player ${chosen+1} was the Impostor.`
+      : `❌ Wrong! Player ${impostorIndex+1} was the Impostor.`;
+    container.innerHTML='';
+    const b=document.createElement('button');
+    b.textContent='Play Again';
+    b.onclick = () => location.reload();
+    container.appendChild(b);
+  }
+</script>
+
+</body>
+</html>
